@@ -29,7 +29,14 @@ class SecretBox(
         // - Rejects invalid IV length with IllegalArgumentException.
         // - Output layout is `iv || ciphertextAndTag`.
         // - Must be deterministic for identical inputs (since IV is provided).
-        return iv + plaintext
+        if (iv.size != IV_BYTES) {
+            throw IllegalArgumentException("IV must be $IV_BYTES bytes")
+        }
+
+        val cipher = cipherEncrypt(iv)
+        val ciphertextAndTag = cipher.doFinal(plaintext)
+
+        return iv + ciphertextAndTag
     }
 
     fun decrypt(message: ByteArray): ByteArray? {
@@ -37,7 +44,20 @@ class SecretBox(
         // Requirements checked by tests:
         // - Returns null when the message is too short to contain an IV + tag.
         // - Returns null when authentication fails (tamper detected).
-        return message
+        // musi być przynajmniej IV + coś (ciphertext+tag)
+        if (message.size < IV_BYTES + 1) {
+        return null
+        }
+
+        val iv = message.copyOfRange(0, IV_BYTES)
+        val ciphertextAndTag = message.copyOfRange(IV_BYTES, message.size)
+
+        return try {
+            val cipher = cipherDecrypt(iv)
+            cipher.doFinal(ciphertextAndTag)
+            } catch (e: Exception) {
+            null
+        }
     }
 
     fun encryptBound(plaintext: ByteArray, iv: ByteArray, context: ByteArray): ByteArray {
